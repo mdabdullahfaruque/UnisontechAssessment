@@ -1,22 +1,9 @@
-using Microsoft.EntityFrameworkCore;
-using Library.Repository.Data;
-using Library.Core.Interfaces;
-using Library.Repository;
-using Library.Service.Interfaces;
-using Library.Service.Services;
+using Library.API.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-builder.Services.AddDbContext<LibraryDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-// Register Unit of Work
-builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-// Register Services
-builder.Services.AddScoped<IBookService, BookService>();
-builder.Services.AddScoped<ILibraryService, LibraryService>();
+// Add services to the container using extension methods
+builder.Services.AddLibraryServices(builder.Configuration);
 
 // Add Controllers
 builder.Services.AddControllers();
