@@ -2,74 +2,73 @@ using Library.Core.DTOs;
 using Library.Core.Entities;
 using Library.Core.Interfaces;
 using Library.Service.Interfaces;
+using Microsoft.Extensions.Logging;
+using AutoMapper;
 
 namespace Library.Service.Services;
 
 public class MemberService : IMemberService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<MemberService> _logger;
+    private readonly IMapper _mapper;
 
-    public MemberService(IUnitOfWork unitOfWork)
+    public MemberService(IUnitOfWork unitOfWork, ILogger<MemberService> logger, IMapper mapper)
     {
         _unitOfWork = unitOfWork;
+        _logger = logger;
+        _mapper = mapper;
     }
 
     public async Task<IEnumerable<MemberDto>> GetAllMembersAsync()
     {
         var members = await _unitOfWork.Members.GetAllAsync();
-        return members.Select(MapToDto);
+        return _mapper.Map<IEnumerable<MemberDto>>(members);
     }
 
     public async Task<MemberDto?> GetMemberByIdAsync(int id)
     {
         var member = await _unitOfWork.Members.GetByIdAsync(id);
-        return member != null ? MapToDto(member) : null;
+        return member != null ? _mapper.Map<MemberDto>(member) : null;
     }
 
     public async Task<MemberDto?> GetMemberWithBorrowsAsync(int id)
     {
         var member = await _unitOfWork.Members.GetMemberWithBorrowsAsync(id);
-        return member != null ? MapToDto(member) : null;
+        return member != null ? _mapper.Map<MemberDto>(member) : null;
     }
 
     public async Task<IEnumerable<MemberDto>> GetActiveMembersAsync()
     {
         var members = await _unitOfWork.Members.GetActiveMembersAsync();
-        return members.Select(MapToDto);
+        return _mapper.Map<IEnumerable<MemberDto>>(members);
     }
 
     public async Task<IEnumerable<MemberDto>> GetMembersByTypeAsync(string membershipType)
     {
         var members = await _unitOfWork.Members.GetMembersByTypeAsync(membershipType);
-        return members.Select(MapToDto);
+        return _mapper.Map<IEnumerable<MemberDto>>(members);
     }
 
     public async Task<MemberDto> CreateMemberAsync(CreateMemberDto createMemberDto)
     {
+        _logger.LogInformation("Creating new member: {Email}", createMemberDto.Email);
+        
         // Business logic: Check if email already exists
         var existingMember = await _unitOfWork.Members.GetMemberByEmailAsync(createMemberDto.Email);
         if (existingMember != null)
         {
+            _logger.LogWarning("Member creation failed: Email {Email} already exists", createMemberDto.Email);
             throw new InvalidOperationException($"A member with email '{createMemberDto.Email}' already exists.");
         }
 
-        var member = new Member
-        {
-            FirstName = createMemberDto.FirstName,
-            LastName = createMemberDto.LastName,
-            Email = createMemberDto.Email,
-            PhoneNumber = createMemberDto.PhoneNumber,
-            Address = createMemberDto.Address,
-            MembershipDate = DateTime.UtcNow,
-            MembershipType = createMemberDto.MembershipType,
-            IsActive = true
-        };
+        var member = _mapper.Map<Member>(createMemberDto);
 
         await _unitOfWork.Members.AddAsync(member);
         await _unitOfWork.CompleteAsync();
 
         var createdMember = await _unitOfWork.Members.GetMemberWithBorrowsAsync(member.MemberId);
-        return MapToDto(createdMember!);
+        return _mapper.Map<MemberDto>(createdMember!);
     }
 
     public async Task<MemberDto?> UpdateMemberAsync(int id, UpdateMemberDto updateMemberDto)
@@ -90,19 +89,13 @@ public class MemberService : IMemberService
             }
         }
 
-        member.FirstName = updateMemberDto.FirstName;
-        member.LastName = updateMemberDto.LastName;
-        member.Email = updateMemberDto.Email;
-        member.PhoneNumber = updateMemberDto.PhoneNumber;
-        member.Address = updateMemberDto.Address;
-        member.MembershipType = updateMemberDto.MembershipType;
-        member.IsActive = updateMemberDto.IsActive;
+        _mapper.Map(updateMemberDto, member);
 
         _unitOfWork.Members.Update(member);
         await _unitOfWork.CompleteAsync();
 
         var updatedMember = await _unitOfWork.Members.GetMemberWithBorrowsAsync(member.MemberId);
-        return MapToDto(updatedMember!);
+        return _mapper.Map<MemberDto>(updatedMember!);
     }
 
     public async Task<bool> DeleteMemberAsync(int id)
@@ -130,22 +123,5 @@ public class MemberService : IMemberService
     public async Task<bool> MemberExistsAsync(int id)
     {
         return await _unitOfWork.Members.ExistsAsync(m => m.MemberId == id);
-    }
-
-    private static MemberDto MapToDto(Member member)
-    {
-        return new MemberDto
-        {
-            MemberId = member.MemberId,
-            FirstName = member.FirstName,
-            LastName = member.LastName,
-            Email = member.Email,
-            PhoneNumber = member.PhoneNumber,
-            Address = member.Address,
-            MembershipDate = member.MembershipDate,
-            MembershipType = member.MembershipType,
-            IsActive = member.IsActive,
-            TotalBorrows = member.Borrows?.Count ?? 0
-        };
     }
 }

@@ -2,55 +2,65 @@ using Library.Core.DTOs;
 using Library.Core.Entities;
 using Library.Core.Interfaces;
 using Library.Service.Interfaces;
+using Microsoft.Extensions.Logging;
+using AutoMapper;
 
 namespace Library.Service.Services;
 
 public class BorrowService : IBorrowService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<BorrowService> _logger;
+    private readonly IMapper _mapper;
     private const decimal FinePerDay = 1.00m; // $1 per day overdue
 
-    public BorrowService(IUnitOfWork unitOfWork)
+    public BorrowService(IUnitOfWork unitOfWork, ILogger<BorrowService> logger, IMapper mapper)
     {
         _unitOfWork = unitOfWork;
+        _logger = logger;
+        _mapper = mapper;
     }
 
     public async Task<IEnumerable<BorrowDto>> GetAllBorrowsAsync()
     {
         var borrows = await _unitOfWork.Borrows.GetBorrowsWithDetailsAsync();
-        return borrows.Select(MapToDto);
+        return _mapper.Map<IEnumerable<BorrowDto>>(borrows);
     }
 
     public async Task<BorrowDto?> GetBorrowByIdAsync(int id)
     {
         var borrow = await _unitOfWork.Borrows.GetBorrowWithDetailsAsync(id);
-        return borrow != null ? MapToDto(borrow) : null;
+        return borrow != null ? _mapper.Map<BorrowDto>(borrow) : null;
     }
 
     public async Task<IEnumerable<BorrowDto>> GetOverdueBorrowsAsync()
     {
         var borrows = await _unitOfWork.Borrows.GetOverdueBorrowsAsync();
-        return borrows.Select(MapToDto);
+        return _mapper.Map<IEnumerable<BorrowDto>>(borrows);
     }
 
     public async Task<IEnumerable<BorrowDto>> GetActiveBorrowsAsync()
     {
         var borrows = await _unitOfWork.Borrows.GetActiveBorrowsAsync();
-        return borrows.Select(MapToDto);
+        return _mapper.Map<IEnumerable<BorrowDto>>(borrows);
     }
 
     public async Task<IEnumerable<BorrowDto>> GetBorrowsByMemberIdAsync(int memberId)
     {
         var borrows = await _unitOfWork.Borrows.GetBorrowsByMemberIdAsync(memberId);
-        return borrows.Select(MapToDto);
+        return _mapper.Map<IEnumerable<BorrowDto>>(borrows);
     }
 
     public async Task<BorrowDto> BorrowBookAsync(CreateBorrowDto createBorrowDto)
     {
+        _logger.LogInformation("Processing book borrow request - BookId: {BookId}, MemberId: {MemberId}", 
+            createBorrowDto.BookId, createBorrowDto.MemberId);
+        
         // Business logic: Validate book exists
         var book = await _unitOfWork.Books.GetByIdAsync(createBorrowDto.BookId);
         if (book == null)
         {
+            _logger.LogWarning("Book with ID {BookId} not found", createBorrowDto.BookId);
             throw new InvalidOperationException($"Book with ID {createBorrowDto.BookId} not found.");
         }
 
@@ -84,15 +94,7 @@ public class BorrowService : IBorrowService
         }
 
         // Create borrow record
-        var borrow = new Borrow
-        {
-            BookId = createBorrowDto.BookId,
-            MemberId = createBorrowDto.MemberId,
-            BorrowDate = DateTime.UtcNow,
-            DueDate = DateTime.UtcNow.AddDays(createBorrowDto.BorrowDurationDays),
-            Status = "Active",
-            Fine = 0
-        };
+        var borrow = _mapper.Map<Borrow>(createBorrowDto);
 
         await _unitOfWork.Borrows.AddAsync(borrow);
 
@@ -103,7 +105,7 @@ public class BorrowService : IBorrowService
         await _unitOfWork.CompleteAsync();
 
         var createdBorrow = await _unitOfWork.Borrows.GetBorrowWithDetailsAsync(borrow.BorrowId);
-        return MapToDto(createdBorrow!);
+        return _mapper.Map<BorrowDto>(createdBorrow!);
     }
 
     public async Task<BorrowDto?> ReturnBookAsync(int borrowId, ReturnBookDto returnBookDto)
@@ -158,30 +160,11 @@ public class BorrowService : IBorrowService
         await _unitOfWork.CompleteAsync();
 
         var returnedBorrow = await _unitOfWork.Borrows.GetBorrowWithDetailsAsync(borrow.BorrowId);
-        return MapToDto(returnedBorrow!);
+        return _mapper.Map<BorrowDto>(returnedBorrow!);
     }
 
     public async Task<bool> BorrowExistsAsync(int id)
     {
         return await _unitOfWork.Borrows.ExistsAsync(b => b.BorrowId == id);
-    }
-
-    private static BorrowDto MapToDto(Borrow borrow)
-    {
-        return new BorrowDto
-        {
-            BorrowId = borrow.BorrowId,
-            BookId = borrow.BookId,
-            BookTitle = borrow.Book?.Title ?? string.Empty,
-            BookISBN = borrow.Book?.ISBN ?? string.Empty,
-            MemberId = borrow.MemberId,
-            MemberName = borrow.Member != null ? $"{borrow.Member.FirstName} {borrow.Member.LastName}" : string.Empty,
-            MemberEmail = borrow.Member?.Email ?? string.Empty,
-            BorrowDate = borrow.BorrowDate,
-            DueDate = borrow.DueDate,
-            ReturnDate = borrow.ReturnDate,
-            Status = borrow.Status,
-            Fine = borrow.Fine
-        };
     }
 }

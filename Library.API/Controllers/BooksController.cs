@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Library.Core.DTOs;
+using Library.Core.Models;
 using Library.Service.Interfaces;
+using Library.API.Models;
 
 namespace Library.API.Controllers;
 
@@ -16,14 +18,17 @@ public class BooksController : ControllerBase
     }
 
     /// <summary>
-    /// Get all books
+    /// Get all books with pagination
     /// </summary>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IEnumerable<BookDto>>> GetAllBooks()
+    public async Task<ActionResult<PagedResult<BookDto>>> GetAllBooks([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
-        var books = await _bookService.GetAllBooksAsync();
-        return Ok(books);
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        
+        var result = await _bookService.GetAllBooksPagedAsync(page, pageSize);
+        return Ok(result);
     }
 
     /// <summary>
@@ -72,22 +77,18 @@ public class BooksController : ControllerBase
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<BookDto>> CreateBook([FromBody] CreateBookDto createBookDto)
+    public async Task<ActionResult<ApiResponse<BookDto>>> CreateBook([FromBody] CreateBookDto createBookDto)
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            return BadRequest(ApiResponse<BookDto>.ErrorResponse(
+                "Validation failed", 
+                ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList()));
         }
 
-        try
-        {
-            var book = await _bookService.CreateBookAsync(createBookDto);
-            return CreatedAtAction(nameof(GetBook), new { id = book.BookId }, book);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        var book = await _bookService.CreateBookAsync(createBookDto);
+        var response = ApiResponse<BookDto>.SuccessResponse(book, "Book created successfully");
+        return CreatedAtAction(nameof(GetBook), new { id = book.BookId }, response);
     }
 
     /// <summary>

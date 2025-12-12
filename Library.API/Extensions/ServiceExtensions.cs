@@ -17,6 +17,7 @@ public static class ServiceExtensions
         services.AddDatabaseContext(configuration);
         services.AddRepositories();
         services.AddApplicationServices();
+        services.AddAutoMapperProfiles();
 
         return services;
     }
@@ -51,6 +52,16 @@ public static class ServiceExtensions
         services.AddScoped<ILibraryService, LibraryService>();
         services.AddScoped<IMemberService, MemberService>();
         services.AddScoped<IBorrowService, BorrowService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Register AutoMapper profiles
+    /// </summary>
+    public static IServiceCollection AddAutoMapperProfiles(this IServiceCollection services)
+    {
+        services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
         return services;
     }
