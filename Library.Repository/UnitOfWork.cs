@@ -12,6 +12,7 @@ public class UnitOfWork : IUnitOfWork
     private IBookRepository? _bookRepository;
     private ILibraryRepository? _libraryRepository;
     private IMemberRepository? _memberRepository;
+    private IBorrowRepository? _borrowRepository;
 
     public UnitOfWork(LibraryDbContext context)
     {
@@ -21,6 +22,7 @@ public class UnitOfWork : IUnitOfWork
     public IBookRepository Books => _bookRepository ??= new BookRepository(_context);
     public ILibraryRepository Libraries => _libraryRepository ??= new LibraryRepository(_context);
     public IMemberRepository Members => _memberRepository ??= new MemberRepository(_context);
+    public IBorrowRepository Borrows => _borrowRepository ??= new BorrowRepository(_context);
 
     public async Task<int> CompleteAsync()
     {
