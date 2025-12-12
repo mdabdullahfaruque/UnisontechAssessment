@@ -50,6 +50,7 @@ public static class ServiceExtensions
         services.AddScoped<IBookService, BookService>();
         services.AddScoped<ILibraryService, LibraryService>();
         services.AddScoped<IMemberService, MemberService>();
+        services.AddScoped<IBorrowService, BorrowService>();
 
         return services;
     }
