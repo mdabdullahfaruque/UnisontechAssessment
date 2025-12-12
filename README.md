@@ -55,5 +55,4 @@ Model a basic library management system API with CRUD operations in .NET Core us
 ### Library
 - `GET /api/library` - Get library info
 - `PUT /api/library/{id}` - Update library
-- `GET /api/library/statistics` - Get statistics
 
